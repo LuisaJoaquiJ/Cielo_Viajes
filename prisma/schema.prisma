@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatar        String?
+  role          Role      @default(CLIENT)
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  bookings      Booking[]
+  payments      Payment[]
+  reviews       Review[]
+
+  @@map("users")
+}
+
+model Destination {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  country     String
+  city        String
+  description String
+  coverImage  String
+  images      String[]
+  latitude    Float?
+  longitude   Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviews     Review[]
+  trips       Trip[]
+
+  @@map("destinations")
+}
+
+model Trip {
+  id            String      @id @default(uuid())
+  title         String
+  slug          String      @unique
+  description   String
+  highlights    String[]
+  includes      String[]
+  excludes      String[]
+  coverImage    String
+  images        String[]
+  departureDate DateTime
+  returnDate    DateTime
+  durationDays  Int
+  price         Decimal     @db.Decimal(10, 2)
+  priceChild    Decimal?    @db.Decimal(10, 2)
+  capacity      Int
+  bookedSeats   Int         @default(0)
+  status        TripStatus  @default(DRAFT)
+  departureCity String
+  isFeatured    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+  destinationId String
+  bookings      Booking[]
+  itinerary     Itinerary[]
+  reviews       Review[]
+  destination   Destination @relation(fields: [destinationId], references: [id])
+
+  @@map("trips")
+}
+
+model Itinerary {
+  id            String   @id @default(uuid())
+  day           Int
+  title         String
+  description   String
+  activities    String[]
+  meals         String[]
+  accommodation String?
+  tripId        String
+  trip          Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, day])
+  @@map("itineraries")
+}
+
+model Booking {
+  id                 String        @id @default(uuid())
+  bookingCode        String        @unique @default(cuid())
+  status             BookingStatus @default(PENDING)
+  totalAmount        Decimal       @db.Decimal(10, 2)
+  specialRequests    String?
+  notes              String?
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  userId             String
+  tripId             String
+  trip               Trip          @relation(fields: [tripId], references: [id])
+  user               User          @relation(fields: [userId], references: [id])
+  passengers         Passenger[]
+  payment            Payment?
+
+  @@map("bookings")
+}
+
+model Passenger {
+  id             String        @id @default(uuid())
+  firstName      String
+  lastName       String
+  documentType   String
+  documentNumber String
+  birthDate      DateTime
+  type           PassengerType @default(ADULT)
+  nationality    String?
+  phone          String?
+  email          String?
+  bookingId      String
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("passengers")
+}
+
+model Payment {
+  id                String         @id @default(uuid())
+  amount            Decimal        @db.Decimal(10, 2)
+  currency          String         @default("COP")
+  status            PaymentStatus  @default(PENDING)
+  method            PaymentMethod?
+  externalId        String?
+  externalReference String?
+  gatewayResponse   Json?
+  paidAt            DateTime?
+  refundedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  bookingId         String         @unique
+  userId            String
+  booking           Booking        @relation(fields: [bookingId], references: [id])
+  user              User           @relation(fields: [userId], references: [id])
+
+  @@map("payments")
+}
+
+model Review {
+  id            String       @id @default(uuid())
+  rating        Int
+  title         String?
+  comment       String
+  isPublished   Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  userId        String
+  tripId        String?
+  destinationId String?
+  destination   Destination? @relation(fields: [destinationId], references: [id])
+  trip          Trip?        @relation(fields: [tripId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tripId])
+  @@map("reviews")
+}
+
+model Lead {
+  id        String   @id @default(uuid())
+  nombre    String
+  telefono  String
+  email     String
+  destino   String?
+  createdAt DateTime @default(now())
+  status    String   @default("NUEVO")
+}
+
+model Refund {
+  id             String          @id @default(uuid())
+  passengerName  String
+  pnr            String
+  caseNumber     String?
+  airline        String
+  status         RefundStatus    @default(PENDING)
+  customerPaid   Decimal         @db.Decimal(12, 2)
+  refundReceived Decimal         @default(0) @db.Decimal(12, 2)
+  refundDate     DateTime?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  files          RefundFile[]
+  history        RefundHistory[]
+  segments       RefundSegment[]
+
+  @@map("refunds")
+}
+
+model RefundSegment {
+  id                String   @id @default(uuid())
+  origin            String
+  destination       String
+  departureDate     DateTime
+  ticketPrice       Decimal  @db.Decimal(12, 2)
+  refundOptionPrice Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime @default(now())
+  refundId          String
+  refund            Refund   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+
+  @@map("refund_segments")
+}
+
+model RefundFile {
+  id        String         @id @default(uuid())
+  fileName  String
+  filePath  String
+  fileType  RefundFileType @default(OTRO)
+  createdAt DateTime       @default(now())
+  refundId  String
+  refund    Refund         @relation(fields: [refundId], references: [id], onDelete: Cascade)
+
+  @@map("refund_files")
+}
+
+model RefundHistory {
+  id          String   @id @default(uuid())
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+  refundId    String
+  refund      Refund   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+
+  @@map("refund_history")
+}
+
+enum Role {
+  CLIENT
+  AGENT
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUNDED
+  IN_PROCESS
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  MERCADO_PAGO
+  CASH
+}
+
+enum TripStatus {
+  DRAFT
+  PUBLISHED
+  FULL
+  CANCELLED
+  COMPLETED
+}
+
+enum PassengerType {
+  ADULT
+  CHILD
+  INFANT
+}
+
+enum RefundStatus {
+  PENDING
+  IN_REVIEW
+  SENT
+  REFUNDED
+  REJECTED
+}
+
+enum RefundFileType {
+  TICKET
+  REEMBOLSO
+  PAGO_CLIENTE
+  COMPROBANTE
+  CORREO
+  OTRO
+}
